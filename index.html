@@ -77,6 +77,19 @@ button{cursor:pointer;border:0;background:none}
 .seg input{position:absolute;opacity:0}
 .seg span{display:block;text-align:center;padding:11px 0;border-radius:12px;background:var(--card2);border:1px solid var(--line);font-weight:700}
 .seg input:checked+span{background:var(--pri);border-color:var(--pri);color:#fff}
+.subs{background:var(--card);border:1px solid rgba(139,92,246,.5);border-radius:16px;padding:12px 14px 6px;margin-bottom:14px}
+.subs h4{margin:0 0 4px;font-size:13px;color:var(--pri2)}
+.subrow{display:flex;align-items:center;gap:10px;width:100%;padding:10px 0;text-align:left;border-top:1px solid var(--line)}
+.subrow:first-of-type{border-top:0}
+.subrow .nm{flex:1;min-width:0}
+.subrow .nm b{display:block;font-size:15px}
+.subrow .nm small{color:var(--muted);font-size:12px}
+.subrow .am{font-weight:800;white-space:nowrap}
+.lbl{display:block;color:var(--muted);font-size:12px;font-weight:600;margin:0 0 5px 2px}
+.trow{display:grid;grid-template-columns:44px minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:center;margin-bottom:10px}
+.trow b{font-size:14px;color:var(--pri2);text-align:center}
+.thead{display:grid;grid-template-columns:44px minmax(0,1fr) minmax(0,1fr);gap:10px;margin-bottom:5px}
+.hint{color:var(--muted);font-size:12px;margin:-6px 2px 12px}
 .note{background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.35);border-radius:12px;padding:10px 12px;font-size:13px;color:#d9ccff;margin-bottom:12px}
 .tag{font-size:12px;color:var(--muted);font-weight:600}
 
@@ -287,17 +300,22 @@ function lessonsOn(date) {
   if (mm) for (const o of mm.on) if (o.d === date)
     res.push({ id: o.id, one: o, sid: o.s, t: o.t, l: o.l, base: o.$, date });
   const ab = (mm && mm.ab) || {};
+  const out = [];
   for (const L of res) {
     const k = (mm && mm.mk[L.id]) || {};
+    if (k.h) continue;                   // занятие серии перенесено на другой день/время
     L.cancel = !!k.c; L.price = k.$ != null ? k.$ : L.base;
     L.st = student(L.sid) || { n: 'Ученик удалён' };
     L.name = sName(L.st);
     L.subPaid = ab[L.sid] != null;       // абонемент за этот месяц оплачен
     L.sub = L.subPaid || !!L.st.sub;     // ученик занимается по абонементу
     L.paid = L.subPaid || (!L.sub && !!k.p);
+    out.push(L);
   }
-  return res.sort((a, b) => a.t.localeCompare(b.t));
+  return out.sort((a, b) => a.t.localeCompare(b.t));
 }
+const plural = (n, a, b, c) => { const m = n % 100, k = n % 10; return (m > 10 && m < 20) ? c : k === 1 ? a : (k > 1 && k < 5) ? b : c; };
+const lessonsWord = n => plural(n, 'занятие', 'занятия', 'занятий');
 const sName = s => s.g ? `${s.n} ${s.g}кл` : s.n;
 const WD_SHORT = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 function setMark(L, patch) {
@@ -319,14 +337,19 @@ function tutorMonth(key) {
     }
   const ab = (months[key] && months[key].ab) || {};
   const subs = Object.values(ab).reduce((a, b) => a + b, 0);
-  for (const sid of waitSub) wait += (student(sid) || {}).ab || 0;
+  for (const sid of waitSub) wait += subCalc(sid, key).sum;
   return { paid: paid + subs, wait, subs };
 }
-function lessonsOfStudentInMonth(sid, key) {
-  let n = 0;
+/* Абонемент за месяц = сумма цен всех неотменённых занятий ученика в этом месяце */
+function subCalc(sid, key) {
+  let n = 0, sum = 0;
+  const prices = new Set();
   for (let d = 1, k = daysOfMonth(key); d <= k; d++)
-    n += lessonsOn(`${key}-${pad(d)}`).filter(L => L.sid === sid && !L.cancel).length;
-  return n;
+    for (const L of lessonsOn(`${key}-${pad(d)}`))
+      if (L.sid === sid && !L.cancel) { n++; sum += L.price || 0; prices.add(L.price || 0); }
+  let one = prices.size === 1 ? [...prices][0] : 0;
+  if (!sum) { sum = (student(sid) || {}).ab || 0; one = 0; }   // старые абонементы без цены за занятие
+  return { n, sum, one };
 }
 function catSums(key) {
   const out = {}, mm = months[key];
@@ -375,11 +398,25 @@ function renderSchedule() {
       </div>`;
     }
   }
+  // Напоминание: неоплаченные абонементы за месяц этой недели
+  const subKey = mkey(ymd(addDays(ws, 3))), subMm = months[subKey];
+  const dueSubs = meta.st.filter(s => s.sub && !s.x && !(subMm && subMm.ab[s.id] != null))
+    .map(s => ({ s, c: subCalc(s.id, subKey) })).filter(x => x.c.n > 0);
+  const subsHtml = dueSubs.length ? `
+    <div class="subs">
+      <h4>Абонементы за ${monthTitle(subKey).split(' ')[0].toLowerCase()} — ждут оплаты</h4>
+      ${dueSubs.map(({ s, c }) => `
+        <button class="subrow" data-act="subRow" data-sid="${s.id}" data-k="${subKey}">
+          <span class="nm"><b>${esc(sName(s))}</b><small>${c.n} ${lessonsWord(c.n)}</small></span>
+          <span class="am">${money(c.sum)}</span><span class="pay sub">Оплачен</span>
+        </button>`).join('')}
+    </div>` : '';
   $('#view').innerHTML = `
     <div class="stats">
       <div class="stat p"><div class="l">Оплачено за неделю</div><div class="v">${money(paid)}</div></div>
       <div class="stat w"><div class="l">Ждёт оплаты</div><div class="v">${money(wait)}</div></div>
     </div>
+    ${subsHtml}
     ${html}
     ${any ? '' : `<div class="empty">На этой неделе занятий нет.<br>Нажми <b>+</b>, чтобы добавить.</div>`}
     <button class="fab" data-act="addLesson" aria-label="Добавить занятие">+</button>`;
@@ -391,120 +428,185 @@ function sheetAddLesson() {
   const inWeek = td >= ymd(ws) && td <= ymd(addDays(ws, 6));
   const defWd = inWeek ? wday(td) : 0;
   openSheet(`
-    <h2>Новое занятие</h2><div class="sub">Неделя ${fShort.format(ws)} – ${fShort.format(addDays(ws, 6))}</div>
+    <h2>Новое занятие</h2><div class="sub">Можно выбрать несколько дней — у каждого своё время</div>
     <form id="f">
       <label class="f"><span>Ученик</span>
         <select class="inp" name="s"><option value="new">＋ Новый ученик</option>${st.map(s => `<option value="${s.id}">${esc(sName(s))}</option>`).join('')}</select></label>
       <div id="newSt" class="grid2">
-        <label class="f"><span>Имя</span><input class="inp" name="nn" autocomplete="off" placeholder="Маша"></label>
-        <label class="f"><span>Класс</span><input class="inp" name="ng" inputmode="numeric" placeholder="6"></label>
+        <label class="f"><span>Имя</span><input class="inp" name="nn" autocomplete="off" placeholder="Влад"></label>
+        <label class="f"><span>Класс</span><input class="inp" name="ng" inputmode="numeric" placeholder="3"></label>
       </div>
-      <div class="f"><span style="display:block;color:var(--muted);font-size:12px;font-weight:600;margin:0 0 5px 2px">День недели</span>
-        <div class="wd">${WD_SHORT.map((w, i) => `<label><input type="radio" name="w" value="${i}" ${i === defWd ? 'checked' : ''}><span>${w}</span></label>`).join('')}</div></div>
-      <div class="grid2">
-        <label class="f"><span>Время</span><input class="inp" type="time" name="t" value="15:00" required></label>
-        <label class="f"><span>Длительность</span><select class="inp" name="l">
-          ${[45, 60, 90, 120].map(m => `<option value="${m}" ${m === 60 ? 'selected' : ''}>${m} мин</option>`).join('')}</select></label>
-      </div>
-      <div class="seg">
+      <div class="f"><span class="lbl">Дни недели</span>
+        <div class="wd">${WD_SHORT.map((w, i) => `<label><input type="checkbox" name="w" value="${i}" ${i === defWd ? 'checked' : ''}><span>${w}</span></label>`).join('')}</div></div>
+      <div class="thead"><span></span><span class="lbl">Время</span><span class="lbl">Длительность</span></div>
+      <div id="times"></div>
+      <div class="seg" style="margin-top:6px">
         <label><input type="radio" name="pt" value="one" checked><span>За занятие</span></label>
         <label><input type="radio" name="pt" value="sub"><span>Абонемент</span></label>
       </div>
-      <label class="f"><span id="pLbl">Сумма за занятие</span><input class="inp" name="p" inputmode="numeric" placeholder="2000" required></label>
+      <label class="f"><span>Сумма за одно занятие</span><input class="inp" name="p" inputmode="numeric" placeholder="2000" required></label>
+      <div class="hint" id="pHint" hidden>Абонемент за месяц посчитается сам: число занятий × сумма</div>
       <label class="chk"><input type="checkbox" name="r" checked> Повторять каждую неделю</label>
       <button class="btn pri" type="submit">Добавить</button>
     </form>`, () => {
-    const f = $('#f'), sel = f.s;
-    const isSub = () => f.pt.value === 'sub';
-    const syncPt = () => {
-      $('#pLbl').textContent = isSub() ? 'Цена абонемента в месяц' : 'Сумма за занятие';
-      f.p.placeholder = isSub() ? '8000' : '2000';
+    const f = $('#f'), sel = f.s, times = $('#times'), kept = {};
+    const days = () => [...f.querySelectorAll('[name=w]:checked')].map(c => +c.value);
+    const drawTimes = () => {
+      times.querySelectorAll('.trow').forEach(r => kept[r.dataset.w] = { t: r.querySelector('[data-f=t]').value, l: +r.querySelector('[data-f=l]').value });
+      let prev = { t: '15:00', l: 60 };
+      times.innerHTML = days().map(w => {
+        const v = kept[w] || prev; prev = v;
+        return `<div class="trow" data-w="${w}"><b>${WD_SHORT[w]}</b>
+          <input class="inp" type="time" data-f="t" value="${v.t}" required>${durSelect(v.l, 'data-f="l"')}</div>`;
+      }).join('') || '<div class="hint" style="margin:0 2px 12px">Выбери хотя бы один день</div>';
     };
+    f.querySelectorAll('[name=w]').forEach(c => c.onchange = drawTimes);
+    drawTimes();
+    const isSub = () => f.pt.value === 'sub';
+    const syncPt = () => { $('#pHint').hidden = !isSub(); };
     const sync = () => {
       const s = student(sel.value);
       $('#newSt').style.display = s ? 'none' : '';
-      if (s) { f.pt.value = s.sub ? 'sub' : 'one'; f.p.value = s.sub ? (s.ab || '') : ''; }
+      if (s) f.pt.value = s.sub ? 'sub' : 'one';
       syncPt();
     };
     sel.onchange = sync;
-    f.querySelectorAll('[name=pt]').forEach(r => r.onchange = () => { f.p.value = ''; syncPt(); });
+    f.querySelectorAll('[name=pt]').forEach(r => r.onchange = syncPt);
     sync();
     f.onsubmit = e => {
       e.preventDefault();
+      const rows = [...times.querySelectorAll('.trow')].map(r => ({ w: +r.dataset.w, t: r.querySelector('[data-f=t]').value, l: +r.querySelector('[data-f=l]').value }));
+      if (!rows.length) return toast('Выбери день недели');
       let sid = sel.value, s = student(sid);
       if (!s) {
         const n = f.nn.value.trim(); if (!n) return toast('Введи имя ученика');
         s = { id: uid(), n, g: f.ng.value.trim() }; sid = s.id; meta.st.push(s);
       }
       const price = num(f.p.value);
-      if (!price) return toast(isSub() ? 'Введи цену абонемента' : 'Введи сумму за занятие');
-      if (isSub()) { s.sub = 1; s.ab = price; } else s.sub = 0;
-      const d = ymd(addDays(ws, +f.w.value)), t = f.t.value, l = +f.l.value;
-      const $p = isSub() ? 0 : price;
-      if (f.r.checked) meta.sl.push({ id: uid(), s: sid, w: wday(d), t, l, $: $p, f: d });
-      else { const mm = M(mkey(d)); mm.on.push({ id: uid(), s: sid, d, t, l, $: $p }); saveMonth(mkey(d)); }
-      saveMeta(); closeSheet(); render(); toast('Занятие добавлено');
+      if (!price) return toast('Введи сумму за занятие');
+      s.sub = isSub() ? 1 : 0;
+      for (const r of rows) {
+        const d = ymd(addDays(ws, r.w));
+        if (f.r.checked) meta.sl.push({ id: uid(), s: sid, w: r.w, t: r.t, l: r.l, $: price, f: d });
+        else { const mm = M(mkey(d)); mm.on.push({ id: uid(), s: sid, d, t: r.t, l: r.l, $: price }); saveMonth(mkey(d)); }
+      }
+      saveMeta(); closeSheet(); render(); toast(rows.length > 1 ? `Добавлено ${rows.length} ${lessonsWord(rows.length)} в неделю` : 'Занятие добавлено');
     };
   });
 }
+const durSelect = (v, attr) => {
+  const opts = [45, 60, 90, 120]; if (!opts.includes(v)) opts.push(v);
+  return `<select class="inp" ${attr}>${opts.sort((a, b) => a - b).map(m => `<option value="${m}" ${m === v ? 'selected' : ''}>${m} мин</option>`).join('')}</select>`;
+};
 
 function sheetSub(sid, key) {
-  const s = student(sid), mm = M(key), paid = mm.ab[sid] != null;
-  const cnt = lessonsOfStudentInMonth(sid, key);
+  const s = student(sid), mm = M(key), paid = mm.ab[sid] != null, c = subCalc(sid, key);
+  const mon = monthTitle(key).split(' ')[0].toLowerCase();
+  const calc = c.one ? `${c.n} ${lessonsWord(c.n)} × ${money(c.one)} = <b>${money(c.sum)}</b>`
+                     : `${c.n} ${lessonsWord(c.n)} по расписанию = <b>${money(c.sum)}</b>`;
   openSheet(`
     <h2>Абонемент · ${esc(sName(s))}</h2>
-    <div class="sub">${monthTitle(key)} · занятий в месяце: ${cnt}</div>
-    ${paid ? `<div class="note">✓ Абонемент оплачен — все занятия за ${monthTitle(key).split(' ')[0].toLowerCase()} отмечены оплаченными</div>` : ''}
+    <div class="sub">${monthTitle(key)}</div>
+    <div class="note">${calc}${paid ? `<br>✓ Оплачен: ${money(mm.ab[sid])} — все занятия за ${mon} отмечены` : ''}</div>
     <form id="f">
-      <label class="f"><span>Цена абонемента</span><input class="inp" name="p" inputmode="numeric" value="${paid ? mm.ab[sid] : (s.ab || '')}" placeholder="8000" required></label>
+      <label class="f"><span>Сумма абонемента</span><input class="inp" name="p" inputmode="numeric" value="${paid ? mm.ab[sid] : (c.sum || '')}" required></label>
+      <div class="hint">Посчитано автоматически — при необходимости поправь</div>
       <button class="btn pri" type="submit">${paid ? 'Сохранить сумму' : '✓ Оплачен — отметить все занятия'}</button>
       ${paid ? '<button class="btn danger" type="button" data-act="subUndo">Отменить оплату абонемента</button>' : ''}
     </form>`, () => {
     $('#f').onsubmit = e => {
       e.preventDefault();
       const p = num(e.target.p.value); if (!p) return toast('Введи сумму');
-      mm.ab[sid] = p; s.ab = p; s.sub = 1;
-      saveMonth(key); saveMeta(); haptic(); closeSheet(); render(); toast('Абонемент оплачен');
+      mm.ab[sid] = p; s.sub = 1;
+      saveMonth(key); saveMeta(); haptic(); closeSheet(); render(); toast(paid ? 'Сохранено' : 'Абонемент оплачен');
     };
   });
   ui.curSub = { sid, key };
 }
 
 function sheetLesson(L) {
-  const mon = monthTitle(mkey(L.date)).split(' ')[0].toLowerCase();
+  const key = mkey(L.date), mon = monthTitle(key).split(' ')[0].toLowerCase();
   openSheet(`
     <h2>${esc(L.name)}</h2>
-    <div class="sub">${fDay.format(parse(L.date))}, ${L.t}–${addMin(L.t, L.l)}${L.slot ? ' · каждую неделю' : ' · разовое'}</div>
+    <div class="sub">${fDay.format(parse(L.date))}, ${L.t}–${addMin(L.t, L.l)} · ${money(L.price)}${L.slot ? ' · каждую неделю' : ' · разовое'}</div>
+    <button class="btn pri" data-act="lEdit">Изменить день, время или сумму</button>
     ${L.sub ? `
-      <div class="note">Занимается по абонементу. ${L.subPaid ? `Абонемент за ${mon} оплачен: ${money(M(mkey(L.date)).ab[L.sid])}` : `Абонемент за ${mon} ещё не оплачен`}</div>
-      <button class="btn pri" data-act="lSub">${L.subPaid ? 'Изменить абонемент' : `✓ Абонемент за ${mon} оплачен`}</button>
+      <div class="note" style="margin-top:12px">Занимается по абонементу. ${L.subPaid ? `Абонемент за ${mon} оплачен: ${money(M(key).ab[L.sid])}` : `Абонемент за ${mon} ещё не оплачен`}</div>
+      ${L.subPaid
+        ? `<button class="btn" data-act="lSub">Изменить сумму абонемента</button>
+           <button class="btn danger" data-act="lSubUndo">Отменить оплату абонемента</button>`
+        : `<button class="btn ok" data-act="lSub">✓ Абонемент за ${mon} оплачен</button>`}
       <button class="btn" data-act="lUnsub">Перевести на оплату за занятие</button>`
     : `
-      <form id="f">
-        <label class="f"><span>Сумма за занятие</span><input class="inp" name="p" inputmode="numeric" value="${L.price}"></label>
-        <div class="grid2">
-          <button class="btn" type="submit" name="one" style="margin-top:0">Только это</button>
-          ${L.slot ? `<button class="btn" type="button" data-act="lPriceAll" style="margin-top:0">Это и следующие</button>` : ''}
-        </div>
-      </form>
       <button class="btn ${L.paid ? '' : 'ok'}" data-act="lPay">${L.paid ? 'Отметить как не оплачено' : '✓ Отметить оплаченным'}</button>
       <button class="btn" data-act="lSub">Оплатил абонемент за ${mon}</button>`}
     <button class="btn" data-act="lCancel">${L.cancel ? 'Вернуть занятие' : 'Отменить это занятие'}</button>
     ${L.slot ? `<button class="btn danger" data-act="lEnd">Убрать из расписания с этого дня</button>`
-             : `<button class="btn danger" data-act="lDel">Удалить занятие</button>`}`, () => {
-    const f = $('#f');
-    if (f) f.onsubmit = e => { e.preventDefault(); setMark(L, { $: num(f.p.value) }); closeSheet(); render(); toast('Сохранено'); };
-  });
+             : `<button class="btn danger" data-act="lDel">Удалить занятие</button>`}`);
   ui.cur = L;
 }
 
-/* Новая цена для этого и всех следующих занятий серии: старая серия заканчивается, начинается новая */
-function splitSlotPrice(L, price) {
-  const s = L.slot;
-  if (L.date <= s.f) { s.$ = price; }
-  else { meta.sl.push(Object.assign({}, s, { id: uid(), f: L.date, $: price })); s.u = L.date; }
+function sheetEdit(L) {
+  const ws = mondayOf(parse(L.date));
+  openSheet(`
+    <h2>Изменить · ${esc(L.name)}</h2>
+    <div class="sub">Сейчас: ${fDay.format(parse(L.date))}, ${L.t}</div>
+    <form id="f">
+      <div class="f"><span class="lbl">День недели</span>
+        <div class="wd">${WD_SHORT.map((w, i) => `<label><input type="radio" name="w" value="${i}" ${i === wday(L.date) ? 'checked' : ''}><span>${w}</span></label>`).join('')}</div></div>
+      <div class="grid2">
+        <label class="f"><span>Время</span><input class="inp" type="time" name="t" value="${L.t}" required></label>
+        <label class="f"><span>Длительность</span>${durSelect(L.l, 'name="l"')}</label>
+      </div>
+      <label class="f"><span>${L.sub ? 'Сумма за занятие (для подсчёта абонемента)' : 'Сумма за занятие'}</span><input class="inp" name="p" inputmode="numeric" value="${L.price}" required></label>
+      ${L.slot
+        ? `<button class="btn pri" type="button" data-mode="all">Сохранить — это и все следующие</button>
+           <button class="btn" type="button" data-mode="one">Только это занятие</button>`
+        : `<button class="btn pri" type="button" data-mode="one">Сохранить</button>`}
+    </form>`, () => {
+    const f = $('#f');
+    f.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
+      if (!f.reportValidity()) return;
+      const p = num(f.p.value); if (!p) return toast('Введи сумму');
+      const w = +f.w.value, nd = ymd(addDays(ws, w)), t = f.t.value, l = +f.l.value;
+      if (b.dataset.mode === 'all') editSeries(L, { w, t, l, $: p });
+      else editOne(L, nd, t, l, p);
+      closeSheet(); render(); toast('Сохранено');
+    });
+  });
+}
+
+/* Изменить серию начиная с этой недели: старая серия заканчивается, начинается новая */
+function editSeries(L, patch) {
+  const s = L.slot, mon = ymd(mondayOf(parse(L.date)));
   setMark(L, { $: undefined });
+  if (L.date <= s.f) { Object.assign(s, patch); s.f = mon; }
+  else { meta.sl.push(Object.assign({}, s, patch, { id: uid(), f: mon })); s.u = L.date; }
   saveMeta();
+}
+
+/* Изменить только одно занятие */
+function editOne(L, nd, t, l, p) {
+  if (L.one) {                                   // разовое — меняем на месте
+    const o = L.one, oldK = mkey(o.d), newK = mkey(nd), mark = M(oldK).mk[o.id];
+    if (oldK !== newK) {
+      M(oldK).on = M(oldK).on.filter(x => x !== o); delete M(oldK).mk[o.id];
+      M(newK).on.push(o); if (mark) M(newK).mk[o.id] = mark;
+      saveMonth(oldK);
+    }
+    Object.assign(o, { d: nd, t, l, $: p });
+    if (M(newK).mk[o.id]) delete M(newK).mk[o.id].$;
+    saveMonth(newK);
+    return;
+  }
+  if (nd === L.date && t === L.t && l === L.l) { setMark(L, { $: p === L.base ? undefined : p }); return; }
+  // занятие серии переносится: прячем его и создаём разовое на новое время
+  setMark(L, { h: 1 });
+  const id = uid(), k = mkey(nd);
+  M(k).on.push({ id, s: L.sid, d: nd, t, l, $: p });
+  if (L.paid && !L.sub) M(k).mk[id] = { p: 1 };
+  if (L.cancel) M(k).mk[id] = Object.assign(M(k).mk[id] || {}, { c: 1 });
+  saveMonth(k);
 }
 
 function sheetStudents() {
@@ -702,12 +804,15 @@ document.addEventListener('click', async e => {
     }
     case 'lUnsub': {
       const L = ui.cur;
-      if (!await ask(`Перевести «${L.name}» на оплату за каждое занятие? Уже оплаченные абонементы останутся. Цену занятий потом нужно будет указать.`)) break;
+      if (!await ask(`Перевести «${L.name}» на оплату за каждое занятие? Уже оплаченные абонементы останутся.`)) break;
       L.st.sub = 0; saveMeta(); closeSheet(); render(); break;
     }
-    case 'lPriceAll': {
-      const L = ui.cur, p = num($('#f').p.value); if (!p) return toast('Введи сумму');
-      splitSlotPrice(L, p); closeSheet(); render(); toast('Цена изменена для этого и следующих'); break;
+    case 'lEdit': sheetEdit(ui.cur); break;
+    case 'subRow': sheetSub(el.dataset.sid, el.dataset.k); break;
+    case 'lSubUndo': {
+      const L = ui.cur;
+      if (!await ask('Отменить оплату абонемента за этот месяц?')) break;
+      delete M(mkey(L.date)).ab[L.sid]; saveMonth(mkey(L.date)); closeSheet(); render(); toast('Оплата абонемента отменена'); break;
     }
     case 'stDel': {
       const s = student(el.dataset.id);
