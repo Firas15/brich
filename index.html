@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#120b1f">
+<title>brich</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{
+  --bg:#120b1f; --card:#1d1430; --card2:#291c44; --line:#35265c;
+  --text:#f4f0fd; --muted:#a395c6; --pri:#8b5cf6; --pri2:#b69cff;
+  --paid:#22c55e; --warn:#f5a524; --danger:#f43f5e;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font:15px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+#top{display:flex;align-items:center;gap:6px;padding:10px 12px;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,#1c1131,#150d25)}
+#top .ttl{flex:1;font-weight:700;font-size:17px;text-align:center;padding:6px}
+#top .nav,#top .ico{width:38px;height:38px;border-radius:12px;background:var(--card2);font-size:20px;
+  display:grid;place-items:center;color:var(--pri2)}
+#top .ico svg{width:20px;height:20px}
+#view{flex:1;overflow-y:auto;padding:12px 12px 110px}
+#tabs{display:flex;border-top:1px solid var(--line);background:#150d25;
+  padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+#tabs button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px;
+  color:var(--muted);font-size:12px;font-weight:600;border-radius:12px}
+#tabs button svg{width:24px;height:24px}
+#tabs button.on{color:var(--pri2);background:rgba(139,92,246,.12)}
+.brand{font-weight:800;letter-spacing:.5px;background:linear-gradient(90deg,#c4b5fd,#8b5cf6);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px}
+.stat .l{color:var(--muted);font-size:12px;font-weight:600}
+.stat .v{font-size:20px;font-weight:800;margin-top:2px}
+.stat.p .v{color:var(--paid)} .stat.w .v{color:var(--warn)}
+.hero{background:linear-gradient(135deg,#7c3aed,#4c1d95);border-radius:20px;padding:16px;margin-bottom:14px}
+.hero .l{opacity:.8;font-size:13px;font-weight:600}
+.hero .v{font-size:30px;font-weight:800;margin-top:2px}
+.hero .s{opacity:.8;font-size:13px;margin-top:4px}
+
+.day{font-weight:700;color:var(--muted);font-size:13px;text-transform:lowercase;margin:16px 4px 6px}
+.day:first-child{margin-top:0}
+.day.today{color:var(--pri2)}
+.day.today::after{content:" · сегодня"}
+.empty-day{color:var(--muted);font-size:13px;padding:10px 14px;background:var(--card);border-radius:14px}
+.lesson{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);
+  border-radius:16px;padding:10px 12px;margin-bottom:8px}
+.lesson .tm{font-weight:700;font-size:14px;text-align:right;min-width:44px;line-height:1.5}
+.lesson .tm span{display:block;color:var(--muted);font-weight:600}
+.lesson .bar{width:4px;align-self:stretch;border-radius:4px;background:var(--pri)}
+.lesson.paid .bar{background:var(--paid)}
+.lesson .nm{flex:1;min-width:0}
+.lesson .nm b{display:block;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lesson .nm span{color:var(--muted);font-size:13px}
+.lesson.cancel{opacity:.45}
+.lesson.cancel .nm b{text-decoration:line-through}
+.pay{padding:8px 10px;border-radius:12px;font-size:13px;font-weight:700;white-space:nowrap;
+  border:1.5px solid var(--warn);color:var(--warn)}
+.pay.on{background:var(--paid);border-color:var(--paid);color:#06210f}
+.pay.sub{border-color:var(--pri2);color:var(--pri2)}
+.pay.sub.on{background:var(--pri);border-color:var(--pri);color:#fff}
+.lesson.subpaid .bar{background:var(--pri)}
+.wd{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.wd label{position:relative}
+.wd input{position:absolute;opacity:0}
+.wd span{display:block;text-align:center;padding:10px 0;border-radius:12px;background:var(--card2);border:1px solid var(--line);font-weight:700;font-size:13px}
+.wd input:checked+span{background:var(--pri);border-color:var(--pri);color:#fff}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+.seg label{position:relative}
+.seg input{position:absolute;opacity:0}
+.seg span{display:block;text-align:center;padding:11px 0;border-radius:12px;background:var(--card2);border:1px solid var(--line);font-weight:700}
+.seg input:checked+span{background:var(--pri);border-color:var(--pri);color:#fff}
+.note{background:rgba(139,92,246,.12);border:1px solid rgba(139,92,246,.35);border-radius:12px;padding:10px 12px;font-size:13px;color:#d9ccff;margin-bottom:12px}
+.tag{font-size:12px;color:var(--muted);font-weight:600}
+
+.sec{font-weight:700;color:var(--muted);font-size:13px;margin:18px 4px 8px;display:flex;justify-content:space-between;align-items:center}
+.sec button{color:var(--pri2);font-weight:700;font-size:13px}
+.row{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);
+  border-radius:14px;padding:12px 14px;margin-bottom:8px}
+.row .nm{flex:1;min-width:0}
+.row .nm small{display:block;color:var(--muted);font-size:12px}
+.row .am{font-weight:800}
+.row.auto{border-color:rgba(139,92,246,.5)}
+.dot{width:10px;height:10px;border-radius:50%;flex:none}
+.empty{text-align:center;color:var(--muted);padding:40px 20px}
+
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:16px;background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap}
+th,td{padding:10px;text-align:right;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--card);font-weight:700}
+th{color:var(--muted);font-weight:700;font-size:12px;background:var(--card2)}
+th:first-child{background:var(--card2)}
+td.tot{font-weight:800;color:var(--pri2)}
+tr.cur td{background:rgba(139,92,246,.1)}
+tr.cur td:first-child{background:#2a1f46}
+tfoot td{font-weight:800;border-bottom:0;background:var(--card2)}
+tfoot td:first-child{background:var(--card2)}
+td.z{color:#5b4d80}
+tbody tr{cursor:pointer}
+
+.fab{position:fixed;right:18px;bottom:calc(82px + env(safe-area-inset-bottom));width:56px;height:56px;border-radius:18px;
+  background:linear-gradient(135deg,#a78bfa,#7c3aed);color:#fff;font-size:30px;font-weight:300;
+  box-shadow:0 8px 24px rgba(124,58,237,.45);display:grid;place-items:center}
+
+#sheet-wrap{position:fixed;inset:0;z-index:10}
+#sheet-wrap[hidden]{display:none}
+.backdrop{position:absolute;inset:0;background:rgba(5,2,12,.6)}
+.sheet{position:absolute;left:0;right:0;bottom:0;max-height:88vh;overflow-y:auto;background:#1a1129;
+  border-radius:22px 22px 0 0;border-top:1px solid var(--line);padding:8px 16px calc(20px + env(safe-area-inset-bottom));
+  animation:up .2s ease-out}
+@keyframes up{from{transform:translateY(40px);opacity:0}}
+.sheet .grab{width:40px;height:5px;border-radius:3px;background:var(--line);margin:4px auto 12px}
+.sheet h2{margin:0 0 4px;font-size:20px}
+.sheet .sub{color:var(--muted);font-size:13px;margin-bottom:14px}
+label.f{display:block;margin-bottom:12px}
+label.f>span{display:block;color:var(--muted);font-size:12px;font-weight:600;margin:0 0 5px 2px}
+.inp{width:100%;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;outline:none;min-height:44px}
+.inp:focus{border-color:var(--pri)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.chk{display:flex;align-items:center;gap:10px;margin:4px 0 14px;font-weight:600}
+.chk input{width:22px;height:22px;accent-color:var(--pri)}
+.btn{display:block;width:100%;padding:13px;border-radius:14px;font-weight:700;text-align:center;margin-top:8px;background:var(--card2);color:var(--text)}
+.btn.pri{background:linear-gradient(135deg,#a78bfa,#7c3aed);color:#fff}
+.btn.danger{color:var(--danger)}
+.btn.ok{color:var(--paid)}
+.edit-row{display:flex;gap:8px;margin-bottom:8px;align-items:center}
+.edit-row .inp{flex:1}
+.edit-row .inp.sm{flex:0 0 96px}
+.x{width:44px;height:44px;border-radius:12px;background:var(--card2);color:var(--danger);font-size:18px;flex:none}
+.loader{display:grid;place-items:center;height:60vh;color:var(--muted)}
+#toast{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  background:#2d1f4d;border:1px solid var(--line);padding:10px 16px;border-radius:12px;font-size:14px;
+  opacity:0;pointer-events:none;transition:opacity .2s;z-index:20;white-space:nowrap}
+#toast.on{opacity:1}
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="top"></header>
+  <main id="view"><div class="loader">Загрузка…</div></main>
+  <nav id="tabs">
+    <button data-tab="sch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Расписание</button>
+    <button data-tab="inc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="6" width="20" height="13" rx="3"/><circle cx="12" cy="12.5" r="2.5"/><path d="M6 9.5v6M18 9.5v6"/></svg>Доходы</button>
+    <button data-tab="year"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Год</button>
+  </nav>
+</div>
+<div id="sheet-wrap" hidden><div class="backdrop" data-act="close"></div><div class="sheet" id="sheet"></div></div>
+<div id="toast"></div>
+
+<script>
+/* ================= Telegram ================= */
+const tg = window.Telegram && window.Telegram.WebApp;
+const IN_TG = !!(tg && tg.initData);
+const ver = v => IN_TG && tg.isVersionAtLeast && tg.isVersionAtLeast(v);
+const CLOUD = ver('6.9') && !!tg.CloudStorage;
+if (IN_TG) {
+  tg.ready(); tg.expand();
+  try { tg.setHeaderColor('#150d25'); tg.setBackgroundColor('#120b1f'); } catch (e) {}
+  try { if (ver('7.7')) tg.disableVerticalSwipes(); } catch (e) {}
+}
+const haptic = () => { try { if (ver('6.1')) tg.HapticFeedback.impactOccurred('light'); } catch (e) {} };
+const ask = msg => new Promise(r => { if (ver('6.2')) tg.showConfirm(msg, ok => r(!!ok)); else r(confirm(msg)); });
+
+/* ================= Utils ================= */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36).slice(-5) + Math.random().toString(36).slice(2, 5);
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const mondayOf = d => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); return addDays(x, -((x.getDay() + 6) % 7)); };
+const wday = s => (parse(s).getDay() + 6) % 7;
+const mkey = s => s.slice(0, 7);
+const today = () => ymd(new Date());
+const money = n => Math.round(n || 0).toLocaleString('ru-RU') + ' ₽';
+const num = v => { const n = Number(String(v ?? '').replace(/\s/g, '').replace(',', '.')); return isFinite(n) ? n : 0; };
+const addMin = (t, m) => { const [h, mi] = t.split(':').map(Number); const x = h * 60 + mi + m; return `${pad(Math.floor(x / 60) % 24)}:${pad(x % 60)}`; };
+const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const MON_SHORT = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+const fShort = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short' });
+const fDay = new Intl.DateTimeFormat('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
+const fDate = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' });
+const COLORS = ['#a78bfa','#f472b6','#38bdf8','#fbbf24','#34d399','#fb7185','#c084fc','#60a5fa'];
+const ICON_USERS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M16 4a4 4 0 0 1 0 8M22 21c0-3-2-5-4-5.5"/></svg>';
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), 1800); }
+
+/* ================= Storage =================
+   meta  -> ученики (st), повторяющиеся занятия (sl), категории доходов (cat)
+   m_YYYY_MM -> отметки занятий (mk), разовые занятия (on), доходы (inc)
+   Значения длиннее 4000 символов режутся на куски (лимит CloudStorage — 4096). */
+let meta = { st: [], sl: [], cat: [] };
+let months = {};
+const M = k => months[k] || (months[k] = { mk: {}, on: [], inc: [], ab: {} });
+const LS = 'brich_';
+const CHUNK = 4000;
+const cs = CLOUD ? tg.CloudStorage : null;
+const call = (fn, ...a) => new Promise((res, rej) => fn.call(cs, ...a, (err, v) => err ? rej(err) : res(v)));
+
+const backend = CLOUD ? {
+  async all() {
+    const keys = await call(cs.getKeys);
+    const out = {};
+    for (let i = 0; i < keys.length; i += 20) Object.assign(out, await call(cs.getItems, keys.slice(i, i + 20)));
+    return out;
+  },
+  set: (k, v) => call(cs.setItem, k, v),
+} : {
+  async all() {
+    const out = {};
+    try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith(LS)) out[k.slice(LS.length)] = localStorage.getItem(k); } } catch (e) {}
+    return out;
+  },
+  async set(k, v) { try { localStorage.setItem(LS + k, v); } catch (e) {} },
+};
+
+async function writeKey(key, str) {
+  if (str.length <= CHUNK) return backend.set(key, str);
+  const n = Math.ceil(str.length / CHUNK);
+  for (let i = 0; i < n; i++) await backend.set(`${key}__${i}`, str.slice(i * CHUNK, (i + 1) * CHUNK));
+  await backend.set(key, '@' + n);
+}
+function readKey(all, key) {
+  const v = all[key];
+  if (v == null || v === '') return null;
+  if (v[0] === '@') { let s = ''; for (let i = 0, n = +v.slice(1); i < n; i++) s += all[`${key}__${i}`] || ''; return s; }
+  return v;
+}
+const dirty = new Set();
+let saving = Promise.resolve();
+function save(key) { dirty.add(key); clearTimeout(save.h); save.h = setTimeout(flush, 300); }
+function flush() {
+  const keys = [...dirty]; dirty.clear();
+  saving = saving.then(async () => {
+    for (const k of keys) {
+      const str = k === 'meta' ? JSON.stringify(meta) : JSON.stringify(months[k]);
+      const sk = k === 'meta' ? 'meta' : 'm_' + k.replace('-', '_');
+      try { await writeKey(sk, str); } catch (e) { toast('Не удалось сохранить, проверь интернет'); dirty.add(k); }
+    }
+  });
+}
+const saveMeta = () => save('meta');
+const saveMonth = k => save(k);
+
+async function load() {
+  let all = {};
+  try { all = await backend.all(); } catch (e) { toast('Не удалось загрузить данные'); }
+  const m = readKey(all, 'meta');
+  if (m) { try { meta = Object.assign({ st: [], sl: [], cat: [] }, JSON.parse(m)); } catch (e) {} }
+  else {
+    meta.cat = [{ id: uid(), n: 'Онлайн-школа' }, { id: uid(), n: 'Стипендия' }];
+    saveMeta();
+  }
+  for (const k of Object.keys(all)) {
+    const mt = /^m_(\d{4})_(\d{2})$/.exec(k);
+    if (!mt) continue;
+    try { months[`${mt[1]}-${mt[2]}`] = Object.assign({ mk: {}, on: [], inc: [], ab: {} }, JSON.parse(readKey(all, k))); } catch (e) {}
+  }
+}
+
+/* ================= Data logic ================= */
+const student = id => meta.st.find(s => s.id === id);
+const cat = id => meta.cat.find(c => c.id === id);
+const catColor = id => COLORS[(meta.cat.findIndex(c => c.id === id) + 1) % COLORS.length];
+
+function lessonsOn(date) {
+  const res = [], mm = months[mkey(date)], wd = wday(date);
+  for (const s of meta.sl)
+    if (s.w === wd && s.f <= date && (!s.u || date < s.u))
+      res.push({ id: s.id + '_' + date.replace(/-/g, ''), slot: s, sid: s.s, t: s.t, l: s.l, base: s.$, date });
+  if (mm) for (const o of mm.on) if (o.d === date)
+    res.push({ id: o.id, one: o, sid: o.s, t: o.t, l: o.l, base: o.$, date });
+  const ab = (mm && mm.ab) || {};
+  for (const L of res) {
+    const k = (mm && mm.mk[L.id]) || {};
+    L.cancel = !!k.c; L.price = k.$ != null ? k.$ : L.base;
+    L.st = student(L.sid) || { n: 'Ученик удалён' };
+    L.name = sName(L.st);
+    L.subPaid = ab[L.sid] != null;       // абонемент за этот месяц оплачен
+    L.sub = L.subPaid || !!L.st.sub;     // ученик занимается по абонементу
+    L.paid = L.subPaid || (!L.sub && !!k.p);
+  }
+  return res.sort((a, b) => a.t.localeCompare(b.t));
+}
+const sName = s => s.g ? `${s.n} ${s.g}кл` : s.n;
+const WD_SHORT = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+function setMark(L, patch) {
+  const key = mkey(L.date), mm = M(key);
+  const m = Object.assign({}, mm.mk[L.id], patch);
+  for (const k of Object.keys(m)) if (m[k] == null || m[k] === 0 && k !== '$') delete m[k];
+  if (Object.keys(m).length) mm.mk[L.id] = m; else delete mm.mk[L.id];
+  saveMonth(key);
+}
+function daysOfMonth(key) { const [y, m] = key.split('-').map(Number); return new Date(y, m, 0).getDate(); }
+function tutorMonth(key) {
+  let paid = 0, wait = 0;
+  const waitSub = new Set();
+  for (let d = 1, n = daysOfMonth(key); d <= n; d++)
+    for (const L of lessonsOn(`${key}-${pad(d)}`)) {
+      if (L.cancel || L.subPaid) continue;
+      if (L.sub) { waitSub.add(L.sid); continue; }
+      if (L.paid) paid += L.price; else wait += L.price;
+    }
+  const ab = (months[key] && months[key].ab) || {};
+  const subs = Object.values(ab).reduce((a, b) => a + b, 0);
+  for (const sid of waitSub) wait += (student(sid) || {}).ab || 0;
+  return { paid: paid + subs, wait, subs };
+}
+function lessonsOfStudentInMonth(sid, key) {
+  let n = 0;
+  for (let d = 1, k = daysOfMonth(key); d <= k; d++)
+    n += lessonsOn(`${key}-${pad(d)}`).filter(L => L.sid === sid && !L.cancel).length;
+  return n;
+}
+function catSums(key) {
+  const out = {}, mm = months[key];
+  if (mm) for (const i of mm.inc) out[i.c] = (out[i.c] || 0) + i.a;
+  return out;
+}
+
+/* ================= UI state ================= */
+const now = new Date();
+const ui = { tab: 'sch', week: mondayOf(now), month: `${now.getFullYear()}-${pad(now.getMonth() + 1)}`, year: now.getFullYear(), L: {} };
+const shiftMonth = (k, d) => { const [y, m] = k.split('-').map(Number); const x = new Date(y, m - 1 + d, 1); return `${x.getFullYear()}-${pad(x.getMonth() + 1)}`; };
+const monthTitle = k => { const [y, m] = k.split('-').map(Number); return `${MONTHS[m - 1]} ${y}`; };
+
+function render() {
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === ui.tab));
+  ({ sch: renderSchedule, inc: renderIncome, year: renderYear })[ui.tab]();
+}
+
+/* ---------- Расписание ---------- */
+function renderSchedule() {
+  const ws = ui.week, we = addDays(ws, 6), td = today();
+  $('#top').innerHTML = `
+    <button class="nav" data-act="wk" data-d="-1">‹</button>
+    <button class="ttl" data-act="wk0">${fShort.format(ws)} – ${fShort.format(we)}</button>
+    <button class="nav" data-act="wk" data-d="1">›</button>
+    <button class="ico" data-act="students" aria-label="Ученики">${ICON_USERS}</button>`;
+  let paid = 0, wait = 0, html = '', any = false;
+  ui.L = {};
+  for (let i = 0; i < 7; i++) {
+    const d = ymd(addDays(ws, i)), ls = lessonsOn(d);
+    if (!ls.length && d !== td) continue;
+    html += `<div class="day ${d === td ? 'today' : ''}">${fDay.format(parse(d))}</div>`;
+    if (!ls.length) html += `<div class="empty-day">Занятий нет</div>`;
+    for (const L of ls) {
+      any = true; ui.L[L.id] = L;
+      if (!L.cancel && !L.sub) { if (L.paid) paid += L.price; else wait += L.price; }
+      const btn = L.cancel ? '<span class="tag">отменено</span>'
+        : L.sub ? `<button class="pay sub ${L.subPaid ? 'on' : ''}" data-act="sub" data-id="${L.id}">${L.subPaid ? '✓ Абонемент' : 'Абонемент'}</button>`
+        : `<button class="pay ${L.paid ? 'on' : ''}" data-act="pay" data-id="${L.id}">${L.paid ? '✓ Оплачено' : 'Не оплачено'}</button>`;
+      html += `
+      <div class="lesson ${L.subPaid ? 'subpaid' : L.paid ? 'paid' : ''} ${L.cancel ? 'cancel' : ''}" data-act="lesson" data-id="${L.id}">
+        <div class="tm">${L.t}<span>${addMin(L.t, L.l)}</span></div>
+        <div class="bar"></div>
+        <div class="nm"><b>${esc(L.name)}</b><span>${L.sub ? 'по абонементу' : money(L.price)}${L.one ? ' · разовое' : ''}</span></div>
+        ${btn}
+      </div>`;
+    }
+  }
+  $('#view').innerHTML = `
+    <div class="stats">
+      <div class="stat p"><div class="l">Оплачено за неделю</div><div class="v">${money(paid)}</div></div>
+      <div class="stat w"><div class="l">Ждёт оплаты</div><div class="v">${money(wait)}</div></div>
+    </div>
+    ${html}
+    ${any ? '' : `<div class="empty">На этой неделе занятий нет.<br>Нажми <b>+</b>, чтобы добавить.</div>`}
+    <button class="fab" data-act="addLesson" aria-label="Добавить занятие">+</button>`;
+}
+
+function sheetAddLesson() {
+  const st = meta.st.filter(s => !s.x);
+  const ws = ui.week, td = today();
+  const inWeek = td >= ymd(ws) && td <= ymd(addDays(ws, 6));
+  const defWd = inWeek ? wday(td) : 0;
+  openSheet(`
+    <h2>Новое занятие</h2><div class="sub">Неделя ${fShort.format(ws)} – ${fShort.format(addDays(ws, 6))}</div>
+    <form id="f">
+      <label class="f"><span>Ученик</span>
+        <select class="inp" name="s"><option value="new">＋ Новый ученик</option>${st.map(s => `<option value="${s.id}">${esc(sName(s))}</option>`).join('')}</select></label>
+      <div id="newSt" class="grid2">
+        <label class="f"><span>Имя</span><input class="inp" name="nn" autocomplete="off" placeholder="Маша"></label>
+        <label class="f"><span>Класс</span><input class="inp" name="ng" inputmode="numeric" placeholder="6"></label>
+      </div>
+      <div class="f"><span style="display:block;color:var(--muted);font-size:12px;font-weight:600;margin:0 0 5px 2px">День недели</span>
+        <div class="wd">${WD_SHORT.map((w, i) => `<label><input type="radio" name="w" value="${i}" ${i === defWd ? 'checked' : ''}><span>${w}</span></label>`).join('')}</div></div>
+      <div class="grid2" style="margin-top:12px">
+        <label class="f"><span>Время</span><input class="inp" type="time" name="t" value="15:00" required></label>
+        <label class="f"><span>Длительность</span><select class="inp" name="l">
+          ${[45, 60, 90, 120].map(m => `<option value="${m}" ${m === 60 ? 'selected' : ''}>${m} мин</option>`).join('')}</select></label>
+      </div>
+      <div class="seg">
+        <label><input type="radio" name="pt" value="one" checked><span>За занятие</span></label>
+        <label><input type="radio" name="pt" value="sub"><span>Абонемент</span></label>
+      </div>
+      <label class="f"><span id="pLbl">Сумма за занятие</span><input class="inp" name="p" inputmode="numeric" placeholder="2000" required></label>
+      <label class="chk"><input type="checkbox" name="r" checked> Повторять каждую неделю</label>
+      <button class="btn pri" type="submit">Добавить</button>
+    </form>`, () => {
+    const f = $('#f'), sel = f.s;
+    const isSub = () => f.pt.value === 'sub';
+    const syncPt = () => {
+      $('#pLbl').textContent = isSub() ? 'Цена абонемента в месяц' : 'Сумма за занятие';
+      f.p.placeholder = isSub() ? '8000' : '2000';
+    };
+    const sync = () => {
+      const s = student(sel.value);
+      $('#newSt').style.display = s ? 'none' : '';
+      if (s) { f.pt.value = s.sub ? 'sub' : 'one'; f.p.value = s.sub ? (s.ab || '') : ''; }
+      syncPt();
+    };
+    sel.onchange = sync;
+    f.querySelectorAll('[name=pt]').forEach(r => r.onchange = () => { f.p.value = ''; syncPt(); });
+    sync();
+    f.onsubmit = e => {
+      e.preventDefault();
+      let sid = sel.value, s = student(sid);
+      if (!s) {
+        const n = f.nn.value.trim(); if (!n) return toast('Введи имя ученика');
+        s = { id: uid(), n, g: f.ng.value.trim() }; sid = s.id; meta.st.push(s);
+      }
+      const price = num(f.p.value);
+      if (!price) return toast(isSub() ? 'Введи цену абонемента' : 'Введи сумму за занятие');
+      if (isSub()) { s.sub = 1; s.ab = price; } else s.sub = 0;
+      const d = ymd(addDays(ws, +f.w.value)), t = f.t.value, l = +f.l.value;
+      const $p = isSub() ? 0 : price;
+      if (f.r.checked) meta.sl.push({ id: uid(), s: sid, w: wday(d), t, l, $: $p, f: d });
+      else { const mm = M(mkey(d)); mm.on.push({ id: uid(), s: sid, d, t, l, $: $p }); saveMonth(mkey(d)); }
+      saveMeta(); closeSheet(); render(); toast('Занятие добавлено');
+    };
+  });
+}
+
+function sheetSub(sid, key) {
+  const s = student(sid), mm = M(key), paid = mm.ab[sid] != null;
+  const cnt = lessonsOfStudentInMonth(sid, key);
+  openSheet(`
+    <h2>Абонемент · ${esc(sName(s))}</h2>
+    <div class="sub">${monthTitle(key)} · занятий в месяце: ${cnt}</div>
+    ${paid ? `<div class="note">✓ Абонемент оплачен — все занятия за ${monthTitle(key).split(' ')[0].toLowerCase()} отмечены оплаченными</div>` : ''}
+    <form id="f">
+      <label class="f"><span>Цена абонемента</span><input class="inp" name="p" inputmode="numeric" value="${paid ? mm.ab[sid] : (s.ab || '')}" placeholder="8000" required></label>
+      <button class="btn pri" type="submit">${paid ? 'Сохранить сумму' : '✓ Оплачен — отметить все занятия'}</button>
+      ${paid ? '<button class="btn danger" type="button" data-act="subUndo">Отменить оплату абонемента</button>' : ''}
+    </form>`, () => {
+    $('#f').onsubmit = e => {
+      e.preventDefault();
+      const p = num(e.target.p.value); if (!p) return toast('Введи сумму');
+      mm.ab[sid] = p; s.ab = p; s.sub = 1;
+      saveMonth(key); saveMeta(); haptic(); closeSheet(); render(); toast('Абонемент оплачен');
+    };
+  });
+  ui.curSub = { sid, key };
+}
+
+function sheetLesson(L) {
+  const mon = monthTitle(mkey(L.date)).split(' ')[0].toLowerCase();
+  openSheet(`
+    <h2>${esc(L.name)}</h2>
+    <div class="sub">${fDay.format(parse(L.date))}, ${L.t}–${addMin(L.t, L.l)}${L.slot ? ' · каждую неделю' : ' · разовое'}</div>
+    ${L.sub ? `
+      <div class="note">Занимается по абонементу. ${L.subPaid ? `Абонемент за ${mon} оплачен: ${money(M(mkey(L.date)).ab[L.sid])}` : `Абонемент за ${mon} ещё не оплачен`}</div>
+      <button class="btn pri" data-act="lSub">${L.subPaid ? 'Изменить абонемент' : `✓ Абонемент за ${mon} оплачен`}</button>
+      <button class="btn" data-act="lUnsub">Перевести на оплату за занятие</button>`
+    : `
+      <form id="f">
+        <label class="f"><span>Сумма за занятие</span><input class="inp" name="p" inputmode="numeric" value="${L.price}"></label>
+        <div class="grid2">
+          <button class="btn" type="submit" name="one" style="margin-top:0">Только это</button>
+          ${L.slot ? `<button class="btn" type="button" data-act="lPriceAll" style="margin-top:0">Это и следующие</button>` : ''}
+        </div>
+      </form>
+      <button class="btn ${L.paid ? '' : 'ok'}" data-act="lPay">${L.paid ? 'Отметить как не оплачено' : '✓ Отметить оплаченным'}</button>
+      <button class="btn" data-act="lSub">Оплатил абонемент за ${mon}</button>`}
+    <button class="btn" data-act="lCancel">${L.cancel ? 'Вернуть занятие' : 'Отменить это занятие'}</button>
+    ${L.slot ? `<button class="btn danger" data-act="lEnd">Убрать из расписания с этого дня</button>`
+             : `<button class="btn danger" data-act="lDel">Удалить занятие</button>`}`, () => {
+    const f = $('#f');
+    if (f) f.onsubmit = e => { e.preventDefault(); setMark(L, { $: num(f.p.value) }); closeSheet(); render(); toast('Сохранено'); };
+  });
+  ui.cur = L;
+}
+
+/* Новая цена для этого и всех следующих занятий серии: старая серия заканчивается, начинается новая */
+function splitSlotPrice(L, price) {
+  const s = L.slot;
+  if (L.date <= s.f) { s.$ = price; }
+  else { meta.sl.push(Object.assign({}, s, { id: uid(), f: L.date, $: price })); s.u = L.date; }
+  setMark(L, { $: undefined });
+  saveMeta();
+}
+
+function sheetStudents() {
+  const rows = () => meta.st.filter(s => !s.x).map(s => `
+    <div class="edit-row" data-id="${s.id}">
+      <input class="inp" data-f="n" value="${esc(s.n)}">
+      <input class="inp sm" data-f="g" inputmode="numeric" value="${esc(s.g || '')}" placeholder="класс">
+      <button class="x" data-act="stDel" data-id="${s.id}">✕</button>
+    </div>`).join('') || '<div class="sub">Пока нет учеников. Они добавляются вместе с первым занятием.</div>';
+  openSheet(`
+    <h2>Ученики</h2><div class="sub">Имя и класс можно исправить прямо тут</div>
+    <div id="stList">${rows()}</div>`, () => {
+    $('#stList').onchange = e => {
+      const r = e.target.closest('.edit-row'), s = r && student(r.dataset.id); if (!s) return;
+      if (e.target.dataset.f === 'n') s.n = e.target.value.trim() || s.n; else s.g = e.target.value.trim();
+      saveMeta(); render();
+    };
+  });
+  sheetStudents.rows = rows;
+}
+
+/* ---------- Доходы ---------- */
+function renderIncome() {
+  const k = ui.month;
+  $('#top').innerHTML = `
+    <button class="nav" data-act="mo" data-d="-1">‹</button>
+    <div class="ttl">${monthTitle(k)}</div>
+    <button class="nav" data-act="mo" data-d="1">›</button>
+    <button class="ico" data-act="cats" aria-label="Категории">⚙︎</button>`;
+  const tu = tutorMonth(k), cs = catSums(k);
+  const catTotal = Object.values(cs).reduce((a, b) => a + b, 0);
+  const total = tu.paid + catTotal;
+  const list = (months[k] ? months[k].inc : []).slice().sort((a, b) => b.d.localeCompare(a.d));
+  const shown = meta.cat.filter(c => !c.x || cs[c.id]);
+  $('#view').innerHTML = `
+    <div class="hero"><div class="l">Доход за месяц</div><div class="v">${money(total)}</div>
+      ${tu.wait ? `<div class="s">Ещё ждёт оплаты за занятия: ${money(tu.wait)}</div>` : ''}</div>
+    <div class="sec">По источникам</div>
+    <div class="row auto"><span class="dot" style="background:${COLORS[0]}"></span><div class="nm">Репетиторство<small>${tu.subs ? `в т.ч. абонементы ${money(tu.subs)}` : 'считается автоматически из расписания'}</small></div><div class="am">${money(tu.paid)}</div></div>
+    ${shown.map(c => `<div class="row"><span class="dot" style="background:${catColor(c.id)}"></span><div class="nm">${esc(c.n)}</div><div class="am">${money(cs[c.id])}</div></div>`).join('')}
+    <div class="sec">Записи<button data-act="addInc">+ Добавить</button></div>
+    ${list.length ? list.map(i => `
+      <div class="row" data-act="inc" data-id="${i.id}"><span class="dot" style="background:${catColor(i.c)}"></span>
+        <div class="nm">${esc((cat(i.c) || { n: '—' }).n)}<small>${fDate.format(parse(i.d))}${i.n ? ' · ' + esc(i.n) : ''}</small></div>
+        <div class="am">${money(i.a)}</div></div>`).join('')
+      : `<div class="empty-day">В этом месяце записей нет</div>`}
+    <button class="fab" data-act="addInc" aria-label="Добавить доход">+</button>`;
+}
+
+function sheetIncome(item) {
+  const k = ui.month, td = today();
+  const def = item ? item.d : (mkey(td) === k ? td : `${k}-01`);
+  const cats = meta.cat.filter(c => !c.x || (item && c.id === item.c));
+  openSheet(`
+    <h2>${item ? 'Изменить запись' : 'Новый доход'}</h2><div class="sub">Онлайн-школа, стипендия или что угодно</div>
+    <form id="f">
+      <label class="f"><span>Категория</span>
+        <select class="inp" name="c">${cats.map(c => `<option value="${c.id}" ${item && item.c === c.id ? 'selected' : ''}>${esc(c.n)}</option>`).join('')}<option value="new">＋ Новая категория</option></select></label>
+      <label class="f" id="newCat"><span>Название категории</span><input class="inp" name="cn" autocomplete="off"></label>
+      <div class="grid2">
+        <label class="f"><span>Сумма</span><input class="inp" name="a" inputmode="decimal" value="${item ? item.a : ''}" required></label>
+        <label class="f"><span>Дата</span><input class="inp" type="date" name="d" value="${def}" required></label>
+      </div>
+      <label class="f"><span>Комментарий (необязательно)</span><input class="inp" name="n" value="${item ? esc(item.n || '') : ''}"></label>
+      <button class="btn pri" type="submit">${item ? 'Сохранить' : 'Добавить'}</button>
+      ${item ? `<button class="btn danger" type="button" data-act="incDel">Удалить</button>` : ''}
+    </form>`, () => {
+    const f = $('#f');
+    const sync = () => { $('#newCat').style.display = f.c.value === 'new' ? '' : 'none'; };
+    f.c.onchange = sync; sync();
+    f.onsubmit = e => {
+      e.preventDefault();
+      let c = f.c.value;
+      if (c === 'new') { const n = f.cn.value.trim(); if (!n) return toast('Введи название'); c = uid(); meta.cat.push({ id: c, n }); saveMeta(); }
+      const a = num(f.a.value); if (!a) return toast('Введи сумму');
+      const d = f.d.value;
+      if (item) removeIncome(item);
+      const mm = M(mkey(d));
+      mm.inc.push({ id: item ? item.id : uid(), c, d, a, n: f.n.value.trim() || undefined });
+      saveMonth(mkey(d)); ui.month = mkey(d); closeSheet(); render(); toast('Сохранено');
+    };
+  });
+  ui.curInc = item;
+}
+function removeIncome(item) {
+  const k = mkey(item.d), mm = months[k]; if (!mm) return;
+  mm.inc = mm.inc.filter(i => i.id !== item.id); saveMonth(k);
+}
+
+function sheetCats() {
+  const rows = () => meta.cat.filter(c => !c.x).map(c => `
+    <div class="edit-row" data-id="${c.id}">
+      <span class="dot" style="background:${catColor(c.id)}"></span>
+      <input class="inp" value="${esc(c.n)}">
+      <button class="x" data-act="catDel" data-id="${c.id}">✕</button>
+    </div>`).join('') || '<div class="sub">Категорий нет</div>';
+  openSheet(`
+    <h2>Категории доходов</h2><div class="sub">Репетиторство считается само, его тут нет</div>
+    <div id="catList">${rows()}</div>
+    <div class="edit-row" style="margin-top:14px"><input class="inp" id="catN" placeholder="Новая категория"></div>
+    <button class="btn pri" data-act="catAdd">Добавить категорию</button>`, () => {
+    $('#catList').onchange = e => {
+      const r = e.target.closest('.edit-row'), c = r && cat(r.dataset.id); if (!c) return;
+      c.n = e.target.value.trim() || c.n; saveMeta(); render();
+    };
+  });
+  sheetCats.rows = rows;
+}
+
+/* ---------- Год ---------- */
+function renderYear() {
+  const y = ui.year;
+  $('#top').innerHTML = `
+    <button class="nav" data-act="yr" data-d="-1">‹</button>
+    <div class="ttl"><span class="brand">brich</span> · ${y}</div>
+    <button class="nav" data-act="yr" data-d="1">›</button>`;
+  const rows = [];
+  const used = new Set();
+  for (let m = 1; m <= 12; m++) {
+    const k = `${y}-${pad(m)}`, cs = catSums(k);
+    Object.keys(cs).forEach(id => used.add(id));
+    rows.push({ k, m, tu: tutorMonth(k).paid, cs });
+  }
+  const cols = meta.cat.filter(c => !c.x || used.has(c.id));
+  const colTot = cols.map(c => rows.reduce((a, r) => a + (r.cs[c.id] || 0), 0));
+  const tuTot = rows.reduce((a, r) => a + r.tu, 0);
+  const grand = tuTot + colTot.reduce((a, b) => a + b, 0);
+  const cell = v => v ? `<td>${Math.round(v).toLocaleString('ru-RU')}</td>` : '<td class="z">—</td>';
+  const cur = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+  const filled = rows.filter(r => r.tu || Object.keys(r.cs).length).length;
+  $('#view').innerHTML = `
+    <div class="hero"><div class="l">Доход за ${y} год</div><div class="v">${money(grand)}</div>
+      ${filled ? `<div class="s">В среднем ${money(grand / filled)} в месяц</div>` : ''}</div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Месяц</th><th>Репетит.</th>${cols.map(c => `<th>${esc(c.n)}</th>`).join('')}<th>Итого</th></tr></thead>
+      <tbody>${rows.map(r => {
+        const t = r.tu + cols.reduce((a, c) => a + (r.cs[c.id] || 0), 0);
+        return `<tr class="${r.k === cur ? 'cur' : ''}" data-act="goMonth" data-k="${r.k}"><td>${MON_SHORT[r.m - 1]}</td>${cell(r.tu)}${cols.map(c => cell(r.cs[c.id])).join('')}${t ? `<td class="tot">${Math.round(t).toLocaleString('ru-RU')}</td>` : '<td class="z">—</td>'}</tr>`;
+      }).join('')}</tbody>
+      <tfoot><tr><td>Всего</td><td>${Math.round(tuTot).toLocaleString('ru-RU')}</td>${colTot.map(v => `<td>${Math.round(v).toLocaleString('ru-RU')}</td>`).join('')}<td class="tot">${Math.round(grand).toLocaleString('ru-RU')}</td></tr></tfoot>
+    </table></div>
+    <div class="sub" style="text-align:center;margin-top:10px;color:var(--muted);font-size:12px">Суммы в рублях · нажми на месяц, чтобы открыть его</div>`;
+}
+
+/* ================= Sheet ================= */
+const backHandler = () => closeSheet();
+function openSheet(html, mount) {
+  $('#sheet').innerHTML = `<div class="grab"></div>${html}`;
+  $('#sheet-wrap').hidden = false;
+  if (mount) mount();
+  if (ver('6.1')) { tg.BackButton.onClick(backHandler); tg.BackButton.show(); }
+}
+function closeSheet() {
+  $('#sheet-wrap').hidden = true; $('#sheet').innerHTML = '';
+  if (ver('6.1')) { tg.BackButton.offClick(backHandler); tg.BackButton.hide(); }
+}
+
+/* ================= Events ================= */
+document.addEventListener('click', async e => {
+  const tab = e.target.closest('#tabs button');
+  if (tab) { ui.tab = tab.dataset.tab; render(); $('#view').scrollTop = 0; return; }
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const a = el.dataset.act, d = +el.dataset.d;
+  switch (a) {
+    case 'close': closeSheet(); break;
+    case 'wk': ui.week = addDays(ui.week, 7 * d); render(); break;
+    case 'wk0': ui.week = mondayOf(new Date()); render(); break;
+    case 'mo': ui.month = shiftMonth(ui.month, d); render(); break;
+    case 'yr': ui.year += d; render(); break;
+    case 'goMonth': ui.month = el.dataset.k; ui.tab = 'inc'; render(); break;
+    case 'pay': { e.stopPropagation(); const L = ui.L[el.dataset.id]; setMark(L, { p: L.paid ? 0 : 1 }); haptic(); render(); break; }
+    case 'lesson': sheetLesson(ui.L[el.dataset.id]); break;
+    case 'addLesson': sheetAddLesson(); break;
+    case 'lPay': { const L = ui.cur; setMark(L, { p: L.paid ? 0 : 1 }); haptic(); closeSheet(); render(); break; }
+    case 'lCancel': { const L = ui.cur; setMark(L, { c: L.cancel ? 0 : 1 }); closeSheet(); render(); break; }
+    case 'lEnd': {
+      const L = ui.cur;
+      if (!await ask(`Убрать «${L.st.n}» из расписания начиная с этого дня? Прошлые занятия и оплаты останутся.`)) break;
+      L.slot.u = L.date;
+      if (L.slot.u <= L.slot.f) meta.sl = meta.sl.filter(s => s !== L.slot);
+      saveMeta(); closeSheet(); render(); break;
+    }
+    case 'lDel': {
+      const L = ui.cur; if (!await ask('Удалить это занятие?')) break;
+      const k = mkey(L.date), mm = M(k); mm.on = mm.on.filter(o => o.id !== L.id); delete mm.mk[L.id];
+      saveMonth(k); closeSheet(); render(); break;
+    }
+    case 'students': sheetStudents(); break;
+    case 'sub': { e.stopPropagation(); const L = ui.L[el.dataset.id]; sheetSub(L.sid, mkey(L.date)); break; }
+    case 'lSub': { const L = ui.cur; sheetSub(L.sid, mkey(L.date)); break; }
+    case 'subUndo': {
+      const { sid, key } = ui.curSub;
+      if (!await ask('Отменить оплату абонемента за этот месяц?')) break;
+      delete M(key).ab[sid]; saveMonth(key); closeSheet(); render(); break;
+    }
+    case 'lUnsub': {
+      const L = ui.cur;
+      if (!await ask(`Перевести «${L.name}» на оплату за каждое занятие? Уже оплаченные абонементы останутся. Цену занятий потом нужно будет указать.`)) break;
+      L.st.sub = 0; saveMeta(); closeSheet(); render(); break;
+    }
+    case 'lPriceAll': {
+      const L = ui.cur, p = num($('#f').p.value); if (!p) return toast('Введи сумму');
+      splitSlotPrice(L, p); closeSheet(); render(); toast('Цена изменена для этого и следующих'); break;
+    }
+    case 'stDel': {
+      const s = student(el.dataset.id);
+      if (!await ask(`Удалить ученика «${sName(s)}»? Будущие занятия пропадут из расписания, прошлые оплаты останутся.`)) break;
+      s.x = 1; const td = today();
+      meta.sl = meta.sl.filter(sl => { if (sl.s !== s.id) return true; if (sl.f >= td) return false; if (!sl.u || sl.u > td) sl.u = td; return true; });
+      saveMeta(); $('#stList').innerHTML = sheetStudents.rows(); render(); break;
+    }
+    case 'addInc': sheetIncome(null); break;
+    case 'inc': { const it = (months[ui.month].inc || []).find(i => i.id === el.dataset.id); if (it) sheetIncome(it); break; }
+    case 'incDel': { if (!await ask('Удалить эту запись?')) break; removeIncome(ui.curInc); closeSheet(); render(); break; }
+    case 'cats': sheetCats(); break;
+    case 'catAdd': { const n = $('#catN').value.trim(); if (!n) return toast('Введи название'); meta.cat.push({ id: uid(), n }); saveMeta(); $('#catList').innerHTML = sheetCats.rows(); $('#catN').value = ''; render(); break; }
+    case 'catDel': {
+      const c = cat(el.dataset.id);
+      if (!await ask(`Удалить категорию «${c.n}»? Уже внесённые суммы останутся в отчётах.`)) break;
+      c.x = 1; saveMeta(); $('#catList').innerHTML = sheetCats.rows(); render(); break;
+    }
+  }
+});
+
+(async () => { await load(); render(); })();
+</script>
+</body>
