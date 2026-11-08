@@ -261,14 +261,16 @@ async function load() {
   try { all = await backend.all(); } catch (e) { toast('Не удалось загрузить данные'); }
   const m = readKey(all, 'meta');
   if (m) { try { meta = Object.assign({ st: [], sl: [], cat: [] }, JSON.parse(m)); } catch (e) {} }
-  else {
-    meta.cat = [{ id: uid(), n: 'Онлайн-школа' }, { id: uid(), n: 'Стипендия' }];
-    saveMeta();
-  }
   for (const k of Object.keys(all)) {
     const mt = /^m_(\d{4})_(\d{2})$/.exec(k);
     if (!mt) continue;
     try { months[`${mt[1]}-${mt[2]}`] = Object.assign({ mk: {}, on: [], inc: [], ab: {} }, JSON.parse(readKey(all, k))); } catch (e) {}
+  }
+  // Раньше при первом запуске создавались «Онлайн-школа» и «Стипендия». Убираем их один раз, если в них ничего не вписано.
+  if (!meta.v) {
+    const used = new Set(Object.values(months).flatMap(mm => mm.inc.map(i => i.c)));
+    meta.cat = meta.cat.filter(c => used.has(c.id) || !['Онлайн-школа', 'Стипендия'].includes(c.n));
+    meta.v = 2; saveMeta();
   }
 }
 
@@ -557,7 +559,7 @@ function sheetIncome(item) {
   const def = item ? item.d : (mkey(td) === k ? td : `${k}-01`);
   const cats = meta.cat.filter(c => !c.x || (item && c.id === item.c));
   openSheet(`
-    <h2>${item ? 'Изменить запись' : 'Новый доход'}</h2><div class="sub">Онлайн-школа, стипендия или что угодно</div>
+    <h2>${item ? 'Изменить запись' : 'Новый доход'}</h2><div class="sub">Любой доход кроме репетиторства — категорию называешь сам</div>
     <form id="f">
       <label class="f"><span>Категория</span>
         <select class="inp" name="c">${cats.map(c => `<option value="${c.id}" ${item && item.c === c.id ? 'selected' : ''}>${esc(c.n)}</option>`).join('')}<option value="new">＋ Новая категория</option></select></label>
