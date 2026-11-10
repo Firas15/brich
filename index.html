@@ -56,6 +56,7 @@ button{cursor:pointer;border:0;background:none}
 .lesson .tm span{display:block;color:var(--muted);font-weight:600}
 .lesson .bar{width:4px;align-self:stretch;border-radius:4px;background:var(--pri)}
 .lesson.paid .bar{background:var(--paid)}
+.lesson.free .bar{background:var(--muted)}
 .lesson .nm{flex:1;min-width:0}
 .lesson .nm b{display:block;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lesson .nm span{color:var(--muted);font-size:13px}
@@ -316,7 +317,10 @@ function lessonsOn(date) {
 }
 const plural = (n, a, b, c) => { const m = n % 100, k = n % 10; return (m > 10 && m < 20) ? c : k === 1 ? a : (k > 1 && k < 5) ? b : c; };
 const lessonsWord = n => plural(n, 'занятие', 'занятия', 'занятий');
-const sName = s => s.g ? `${s.n} ${s.g}кл` : s.n;
+const sName = s => s.g && s.g !== '0' ? `${s.n} ${s.g}кл` : s.n;
+// Запись без суммы (созвон, бесплатное занятие) — оплату не ждём
+const isFree = L => !L.sub && !L.price;
+const priceText = L => isFree(L) ? 'без оплаты' : money(L.price);
 const WD_SHORT = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 function setMark(L, patch) {
   const key = mkey(L.date), mm = M(key);
@@ -388,12 +392,13 @@ function renderSchedule() {
       if (!L.cancel && !L.sub) { if (L.paid) paid += L.price; else wait += L.price; }
       const btn = L.cancel ? '<span class="tag">отменено</span>'
         : L.sub ? `<button class="pay sub ${L.subPaid ? 'on' : ''}" data-act="sub" data-id="${L.id}">${L.subPaid ? '✓ Абонемент' : 'Абонемент'}</button>`
+        : isFree(L) ? ''
         : `<button class="pay ${L.paid ? 'on' : ''}" data-act="pay" data-id="${L.id}">${L.paid ? '✓ Оплачено' : 'Не оплачено'}</button>`;
       html += `
-      <div class="lesson ${L.subPaid ? 'subpaid' : L.paid ? 'paid' : ''} ${L.cancel ? 'cancel' : ''}" data-act="lesson" data-id="${L.id}">
+      <div class="lesson ${L.subPaid ? 'subpaid' : L.paid ? 'paid' : isFree(L) ? 'free' : ''} ${L.cancel ? 'cancel' : ''}" data-act="lesson" data-id="${L.id}">
         <div class="tm">${L.t}<span>${addMin(L.t, L.l)}</span></div>
         <div class="bar"></div>
-        <div class="nm"><b>${esc(L.name)}</b><span>${L.sub ? 'по абонементу' : money(L.price)}${L.one ? ' · разовое' : ''}</span></div>
+        <div class="nm"><b>${esc(L.name)}</b><span>${L.sub ? 'по абонементу' : priceText(L)}${L.one ? ' · разовое' : ''}</span></div>
         ${btn}
       </div>`;
     }
@@ -444,7 +449,8 @@ function sheetAddLesson() {
         <label><input type="radio" name="pt" value="one" checked><span>За занятие</span></label>
         <label><input type="radio" name="pt" value="sub"><span>Абонемент</span></label>
       </div>
-      <label class="f"><span>Сумма за одно занятие</span><input class="inp" name="p" inputmode="numeric" placeholder="2000" required></label>
+      <label class="f"><span>Сумма за одно занятие</span><input class="inp" name="p" inputmode="numeric" placeholder="2000"></label>
+      <div class="hint" id="freeHint">Созвон или бесплатное занятие — оставь сумму пустой или 0</div>
       <div class="hint" id="pHint" hidden>Абонемент за месяц посчитается сам: число занятий × сумма</div>
       <label class="chk"><input type="checkbox" name="r" checked> Повторять каждую неделю</label>
       <button class="btn pri" type="submit">Добавить</button>
@@ -463,7 +469,7 @@ function sheetAddLesson() {
     f.querySelectorAll('[name=w]').forEach(c => c.onchange = drawTimes);
     drawTimes();
     const isSub = () => f.pt.value === 'sub';
-    const syncPt = () => { $('#pHint').hidden = !isSub(); };
+    const syncPt = () => { $('#pHint').hidden = !isSub(); $('#freeHint').hidden = isSub(); };
     const sync = () => {
       const s = student(sel.value);
       $('#newSt').style.display = s ? 'none' : '';
@@ -483,7 +489,7 @@ function sheetAddLesson() {
         s = { id: uid(), n, g: f.ng.value.trim() }; sid = s.id; meta.st.push(s);
       }
       const price = num(f.p.value);
-      if (!price) return toast('Введи сумму за занятие');
+      if (!price && isSub()) return toast('Для абонемента введи сумму за занятие');
       s.sub = isSub() ? 1 : 0;
       for (const r of rows) {
         const d = ymd(addDays(ws, r.w));
@@ -528,7 +534,7 @@ function sheetLesson(L) {
   const key = mkey(L.date), mon = monthTitle(key).split(' ')[0].toLowerCase();
   openSheet(`
     <h2>${esc(L.name)}</h2>
-    <div class="sub">${fDay.format(parse(L.date))}, ${L.t}–${addMin(L.t, L.l)} · ${money(L.price)}${L.slot ? ' · каждую неделю' : ' · разовое'}</div>
+    <div class="sub">${fDay.format(parse(L.date))}, ${L.t}–${addMin(L.t, L.l)} · ${priceText(L)}${L.slot ? ' · каждую неделю' : ' · разовое'}</div>
     <button class="btn pri" data-act="lEdit">Изменить день, время или сумму</button>
     ${L.sub ? `
       <div class="note" style="margin-top:12px">Занимается по абонементу. ${L.subPaid ? `Абонемент за ${mon} оплачен: ${money(M(key).ab[L.sid])}` : `Абонемент за ${mon} ещё не оплачен`}</div>
@@ -537,6 +543,7 @@ function sheetLesson(L) {
            <button class="btn danger" data-act="lSubUndo">Отменить оплату абонемента</button>`
         : `<button class="btn ok" data-act="lSub">✓ Абонемент за ${mon} оплачен</button>`}
       <button class="btn" data-act="lUnsub">Перевести на оплату за занятие</button>`
+    : isFree(L) ? `<div class="note" style="margin-top:12px">Без оплаты — не учитывается в «Ждёт оплаты». Сумму можно добавить через «Изменить».</div>`
     : `
       <button class="btn ${L.paid ? '' : 'ok'}" data-act="lPay">${L.paid ? 'Отметить как не оплачено' : '✓ Отметить оплаченным'}</button>
       <button class="btn" data-act="lSub">Оплатил абонемент за ${mon}</button>`}
@@ -558,7 +565,7 @@ function sheetEdit(L) {
         <label class="f"><span>Время</span><input class="inp" type="time" name="t" value="${L.t}" required></label>
         <label class="f"><span>Длительность</span>${durSelect(L.l, 'name="l"')}</label>
       </div>
-      <label class="f"><span>${L.sub ? 'Сумма за занятие (для подсчёта абонемента)' : 'Сумма за занятие'}</span><input class="inp" name="p" inputmode="numeric" value="${L.price}" required></label>
+      <label class="f"><span>${L.sub ? 'Сумма за занятие (для подсчёта абонемента)' : 'Сумма за занятие'}</span><input class="inp" name="p" inputmode="numeric" value="${L.price || ''}" placeholder="0 — без оплаты"></label>
       ${L.slot
         ? `<button class="btn pri" type="button" data-mode="all">Сохранить — это и все следующие</button>
            <button class="btn" type="button" data-mode="one">Только это занятие</button>`
@@ -567,7 +574,7 @@ function sheetEdit(L) {
     const f = $('#f');
     f.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
       if (!f.reportValidity()) return;
-      const p = num(f.p.value); if (!p) return toast('Введи сумму');
+      const p = num(f.p.value); if (!p && L.sub) return toast('Для абонемента введи сумму за занятие');
       const w = +f.w.value, nd = ymd(addDays(ws, w)), t = f.t.value, l = +f.l.value;
       if (b.dataset.mode === 'all') editSeries(L, { w, t, l, $: p });
       else editOne(L, nd, t, l, p);
